@@ -16,8 +16,10 @@ namespace SocietyVaccinations.Controllers
         [HttpGet]
         async public Task<IActionResult> GetAll(string token)
         {
-            if (!await dbc.isAuthenticated(token)) return Helper.err("Unauthorized user");
-            var spots = await dbc.Spots.Include(s => s.SpotVaccines).ToListAsync();
+            var userId = await dbc.getIdFromToken(token);
+            if (userId < 0) return Helper.err("Unauthorized user");
+            var regionId = (await dbc.Societies.FindAsync(userId)).RegionalId;
+            var spots = await dbc.Spots.Include(s => s.SpotVaccines).Where(s => s.RegionalId == regionId).ToListAsync();
             var vaccines = await dbc.Vaccines.ToListAsync();
 
             return Ok(new
