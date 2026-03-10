@@ -1,0 +1,6 @@
+@SocietyVaccinations_HostAddress = http://localhost:5210
+
+GET {{SocietyVaccinations_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
