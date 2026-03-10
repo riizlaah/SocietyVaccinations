@@ -26,21 +26,21 @@ public partial class Vaccination
     public long SpotId { get; set; }
 
     [Column("vaccine_id")]
-    public long VaccineId { get; set; }
+    public long? VaccineId { get; set; }
 
     [Column("doctor_id")]
-    public long DoctorId { get; set; }
+    public long? DoctorId { get; set; }
 
     [Column("officer_id")]
-    public long OfficerId { get; set; }
+    public long? OfficerId { get; set; }
 
     [ForeignKey("DoctorId")]
     [InverseProperty("VaccinationDoctors")]
-    public virtual Medical Doctor { get; set; } = null!;
+    public virtual Medical? Doctor { get; set; } = null!;
 
     [ForeignKey("OfficerId")]
     [InverseProperty("VaccinationOfficers")]
-    public virtual Medical Officer { get; set; } = null!;
+    public virtual Medical? Officer { get; set; } = null!;
 
     [ForeignKey("SocietyId")]
     [InverseProperty("Vaccinations")]
@@ -52,5 +52,16 @@ public partial class Vaccination
 
     [ForeignKey("VaccineId")]
     [InverseProperty("Vaccinations")]
-    public virtual Vaccine Vaccine { get; set; } = null!;
+    public virtual Vaccine? Vaccine { get; set; } = null!;
+}
+
+
+public class VaccinationRegisterDTO
+{
+    [Required]
+    [Range(1, long.MaxValue, ErrorMessage = "Id not valid")]
+    public long spot_id { get; set; }
+
+    [Required]
+    public DateOnly date { get; set; }
 }

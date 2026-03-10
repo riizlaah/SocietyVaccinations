@@ -21,17 +21,27 @@ namespace SocietyVaccinations.Controllers
         {
             var userId = await dbc.getIdFromToken(token);
             if (userId < 0) return Helper.err("Unauthorized user");
-            await dbc.Consultations.AddAsync(new Consultation
+            var consult = await dbc.Consultations.Where(c => c.SocietyId == userId).FirstOrDefaultAsync();
+            if(consult == null)
             {
-                SocietyId = userId,
-                CurrentSymptoms = input.current_symptoms,
-                DiseaseHistory = input.disease_history,
-                DoctorId = null,
-                DoctorNotes = "",
-                Status = "pending"
-            });
+                await dbc.Consultations.AddAsync(new Consultation
+                {
+                    SocietyId = userId,
+                    CurrentSymptoms = input.current_symptoms,
+                    DiseaseHistory = input.disease_history,
+                    DoctorId = null,
+                    DoctorNotes = "",
+                    Status = "pending"
+                });
+            } else
+            {
+                
+                //consult.DiseaseHistory = input.disease_history;
+                //consult.CurrentSymptoms = input.current_symptoms;
+                //consult.DoctorNotes = "";
+            }
             await dbc.SaveChangesAsync();
-            return Ok();
+            return Ok(new {message = "Request consultation sent successful" });
         }
 
         [HttpGet]
