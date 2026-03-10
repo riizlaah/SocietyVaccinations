@@ -25,7 +25,7 @@ public partial class Spot
     public string Address { get; set; } = null!;
 
     [Column("serve")]
-    public byte Serve { get; set; }
+    public byte Serve { get; set; } // for vaccination type maybe? e.g first = 1, second = 2, both = 3
 
     [Column("capacity")]
     public int Capacity { get; set; }

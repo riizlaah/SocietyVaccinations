@@ -17,7 +17,8 @@ namespace SocietyVaccinations.Controllers
         {
             var userId = await dbc.getIdFromToken(token);
             if (userId < 0) return Helper.err("Unauthorized user");
-            if (!await dbc.Spots.AnyAsync(s => s.Id == input.spot_id)) return Helper.err("Spot not found");
+            var spot = await dbc.Spots.FirstOrDefaultAsync(s => s.Id == input.spot_id);
+            if (spot == null) return Helper.err("Spot not found");
             if (!await dbc.Consultations.AnyAsync(c => c.SocietyId == userId && c.Status == "accepted")) return Helper.err("Your consultation must be accepted by doctor before");
             var vaccineCount = await dbc.Vaccinations.CountAsync(v => v.SocietyId == userId);
             var counter = "First";
@@ -30,6 +31,9 @@ namespace SocietyVaccinations.Controllers
                 }
                 counter = "Second";
             }
+            if (counter == "First" && spot.Serve == 2) return Helper.err("This spot is only for second vaccination");
+            if (counter == "Second" && spot.Serve == 1) return Helper.err("This spot is only for first vaccination");
+            if (await dbc.Vaccinations.CountAsync(v => v.Date == input.date) >= spot.Capacity) return Helper.err("The spot has reached max capacity for the requested date");
             await dbc.Vaccinations.AddAsync(new Vaccination
             {
                 SocietyId = userId,
