@@ -22,10 +22,12 @@ namespace SocietyVaccinations.Controllers
         [HttpPost("login")]
         async public Task<IActionResult> Login(SocietyLoginDTO input)
         {
-            var user = dbc.Societies.Include(s => s.Regional).Where(s => s.IdCardNumber == input.id_card_number).FirstOrDefault();
-            if (user == null) return Helper.bad("ID Card Number or password incorrect.");
-            if (!verifyHash(input.password, user.Password)) return Helper.bad("ID Card Number or password incorrect.");
-            var token = GenToken(input.id_card_number);
+            var user = await dbc.Societies.Include(s => s.Regional).Where(s => s.IdCardNumber == input.id_card_number).FirstOrDefaultAsync();
+            if (user == null) return Helper.err("ID Card Number or password incorrect");
+            if (!verifyHash(input.password, user.Password)) return Helper.err("ID Card Number or password incorrect");
+            var token = GenToken(user.Id.ToString());
+            (await dbc.Societies.FindAsync(user.Id)).LoginTokens = "," + token + ",";
+            await dbc.SaveChangesAsync();
             return Ok(new
             {
                 name = user.Name,
@@ -43,31 +45,41 @@ namespace SocietyVaccinations.Controllers
         }
 
         [HttpPost("logout")]
-        [Authorize]
-        async public Task<IActionResult> Logout()
+        //[Authorize]
+        async public Task<IActionResult> Logout(string token)
         {
-            TokenBlacklister.Ban(User.FindFirstValue(JwtRegisteredClaimNames.Jti));
-            return Ok();
+            var society = await dbc.Societies.Where(s => EF.Functions.Like(s.LoginTokens, $"%,{token},%")).FirstOrDefaultAsync();
+            if (society == null) return Helper.err("Invalid token");
+            society.LoginTokens = society.LoginTokens.Replace($"{token},", "");
+            await dbc.SaveChangesAsync();
+            return Ok(new {message = "Logout success" });
         }
 
         private string GenToken(string id)
         {
-            var claims = new Claim[]
+            using(var alg = MD5.Create())
             {
-                new Claim(ClaimTypes.NameIdentifier, id),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            };
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(conf["Jwt:Key"]));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+                var bytes = alg.ComputeHash(Encoding.UTF8.GetBytes(id));
+                var sb = new StringBuilder();
+                foreach(var b in bytes) sb.Append(b.ToString("x2"));
+                return sb.ToString();
+            } 
+            //var claims = new Claim[]
+            //{
+            //    new Claim(ClaimTypes.NameIdentifier, id),
+            //    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            //};
+            //var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(conf["Jwt:Key"]));
+            //var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            var token = new JwtSecurityToken(
-                issuer: conf["Jwt:Issuer"],
-                audience: conf["Jwt:Audience"],
-                claims: claims,
-                expires: DateTime.Now.AddHours(1),
-                signingCredentials: creds);
+            //var token = new JwtSecurityToken(
+            //    issuer: conf["Jwt:Issuer"],
+            //    audience: conf["Jwt:Audience"],
+            //    claims: claims,
+            //    expires: DateTime.Now.AddHours(1),
+            //    signingCredentials: creds);
 
-            return new JwtSecurityTokenHandler().WriteToken(token);
+            //return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
         private string sha256(string s)

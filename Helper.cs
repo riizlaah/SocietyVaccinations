@@ -5,9 +5,14 @@ namespace SocietyVaccinations
     public class Helper
     {
 
-        public static BadRequestObjectResult bad(string msg)
+        public static ContentResult err(string msg, int code = 401)
         {
-            return new BadRequestObjectResult(new { message = msg });
+            return new ContentResult
+            {
+                ContentType = "application/json",
+                Content = "{\"message\": \"" + msg + "\"}",
+                StatusCode = code
+            };
         }
     }
 }

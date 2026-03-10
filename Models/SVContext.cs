@@ -40,7 +40,6 @@ public partial class SVContext : DbContext
     {
         modelBuilder.Entity<Consultation>(entity =>
         {
-            entity.Property(e => e.Id).ValueGeneratedNever();
 
             entity.HasOne(d => d.Doctor).WithMany(p => p.Consultations)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -117,4 +116,14 @@ public partial class SVContext : DbContext
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+
+    async public Task<bool> isAuthenticated(string token) {
+        return await Societies.AnyAsync(s => EF.Functions.Like(s.LoginTokens, $"%,{token},%"));
+    }
+
+    async public Task<long> getIdFromToken(string token)
+    {
+        var user = await Societies.FirstOrDefaultAsync(s => EF.Functions.Like(s.LoginTokens, $"%,{token},%"));
+        return user != null ? user.Id : -1;
+    }
 }

@@ -17,7 +17,7 @@ public partial class Consultation
     public long SocietyId { get; set; }
 
     [Column("doctor_id")]
-    public long DoctorId { get; set; }
+    public long? DoctorId { get; set; }
 
     [Column("status")]
     [StringLength(10)]
@@ -35,9 +35,17 @@ public partial class Consultation
 
     [ForeignKey("DoctorId")]
     [InverseProperty("Consultations")]
-    public virtual Medical Doctor { get; set; } = null!;
+    public virtual Medical? Doctor { get; set; } = null!;
 
     [ForeignKey("SocietyId")]
     [InverseProperty("Consultations")]
     public virtual Society Society { get; set; } = null!;
+}
+
+public class ConsultationReqDTO
+{
+    [Required]
+    public string disease_history { get; set; } = null!;
+    [Required]
+    public string current_symptoms { get; set; } = null!;
 }
