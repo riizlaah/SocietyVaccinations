@@ -65,3 +65,10 @@ public class VaccinationRegisterDTO
     [Required]
     public DateOnly date { get; set; }
 }
+
+public class VaccinationUpdateDTO
+{
+    public long? doctor_id { get; set; } = null;
+
+    public long? vaccine_id { get; set; } = null;
+}

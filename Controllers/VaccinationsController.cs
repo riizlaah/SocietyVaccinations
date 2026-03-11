@@ -1,7 +1,10 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SocietyVaccinations.Models;
+using System.Security.Claims;
 
 namespace SocietyVaccinations.Controllers
 {
@@ -61,6 +64,87 @@ namespace SocietyVaccinations.Controllers
                     second = second
                 }
             });
+        }
+
+        [HttpGet("all")]
+        [Authorize(Roles = "officer")]
+        async public Task<IActionResult> GetAvailable()
+        {
+            var officerId = Convert.ToInt64(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            var officer = await dbc.Medicals.Where(v => v.Id == officerId).Include(m => m.Spot.Regional).FirstAsync();
+            var vaccinations = await dbc.Vaccinations.AsQueryable()
+                .Where(v => v.OfficerId == null || v.OfficerId == officerId)
+                .Where(v => v.SpotId == officer.SpotId)
+                .Include(v => v.Vaccine)
+                .Include(v => v.Doctor)
+                .Include(v => v.Society)
+                .OrderBy(v => (v.VaccineId == null || v.DoctorId == null) ? 0 : 1)
+                .AsSplitQuery()
+                .ToListAsync();
+            return Ok(vaccinations.Select(v => new
+            {
+                id = v.Id,
+                dose = v.Dose,
+                date = v.Date,
+                society = new
+                {
+                    id = v.SocietyId,
+                    name = v.Society.Name,
+                    address = v.Society.Address
+                },
+                vaccine = v.VaccineId == null ? null : new
+                {
+                    id = v.VaccineId,
+                    name = v.Vaccine.Name
+                },
+                vaccinator = v.DoctorId == null ? null : new
+                {
+                    id = v.DoctorId,
+                    name = v.Doctor.Name,
+                    role = v.Doctor.Role
+                },
+                officer = new
+                {
+                    id = officerId,
+                    name = officer.Name,
+                    role = officer.Role
+                },
+                spot = new
+                {
+                    id = officer.SpotId,
+                    name = officer.Spot.Name,
+                    address = officer.Spot.Address,
+                    regional = new
+                    {
+                        id = officer.Spot.RegionalId,
+                        provine = officer.Spot.Regional.Province,
+                        district = officer.Spot.Regional.District
+                    }
+                }
+            }));
+        }
+
+        [HttpPut("{id}")]
+        [Authorize(Roles = "officer")]
+        async public Task<IActionResult> UpdateVaccinations(long id, VaccinationUpdateDTO input)
+        {
+            if (input == null) return Helper.err("Not valid");
+            if(input.doctor_id.HasValue)
+            {
+                if (!await dbc.Medicals.AnyAsync(m => m.Id == input.doctor_id.Value)) return Helper.err("Doctor not found");
+            }
+            if(input.vaccine_id.HasValue)
+            {
+                if (!await dbc.Vaccines.AnyAsync(m => m.Id == input.vaccine_id.Value)) return Helper.err("Vaccine not found");
+            }
+            var vaccination = await dbc.Vaccinations.FindAsync(id);
+            if (vaccination == null) return Helper.err("Vaccination not found", 404);
+            var officerId = Convert.ToInt64(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            if (vaccination.OfficerId == null) vaccination.OfficerId = officerId;
+            vaccination.DoctorId = input.doctor_id;
+            vaccination.VaccineId = input.vaccine_id;
+            await dbc.SaveChangesAsync();
+            return Ok(new {message = "Vaccination updated"});
         }
 
         private async Task<object> formatVaccination(Vaccination vacc)
