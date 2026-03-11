@@ -5,60 +5,62 @@ using SocietyVaccinations.Models;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using Microsoft.OpenApi.Models;
+using System.Security.Claims;
 
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
+builder.Services.AddSingleton<TokenBlacklister>();
 builder.Services.AddDbContext<SVContext>();
-//builder.Services.AddAuthentication().AddJwtBearer(options =>
-//{
-//    options.TokenValidationParameters = new TokenValidationParameters
-//    {
-//        ValidateAudience = true,
-//        ValidateIssuer = true,
-//        ValidateLifetime = true,
-//        ValidateIssuerSigningKey = true,
-//        ValidAudience = builder.Configuration["Jwt:Audience"],
-//        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-//        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
-//    };
-//    options.Events = new JwtBearerEvents
-//    {
-//        OnTokenValidated = async ctx =>
-//        {
+builder.Services.AddAuthentication().AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateAudience = true,
+        ValidateIssuer = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+    };
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async ctx =>
+        {
+            var blacklister = ctx.HttpContext.RequestServices.GetRequiredService<TokenBlacklister>();
+            var tokId = ctx.Principal?.FindFirstValue(JwtRegisteredClaimNames.Jti) ?? "";
 
-//            var tokId = ctx.Principal?.FindFirst(JwtRegisteredClaimNames.Jti).Value;
+            if (blacklister.IsBanned(tokId))
+            {
+                ctx.Fail("Token not valid");
+            }
 
-//            if (TokenBlacklister.IsBanned(tokId.ToString()))
-//            {
-//                ctx.Fail("Token version outdated");
-//            }
-
-//        }
-//    };
-//});
-//builder.Services.AddAuthorization();
+        }
+    };
+});
+builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(opts =>
 {
-    //opts.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    //{
-    //    BearerFormat = "JWT",
-    //    Name = "Authorization",
-    //    In = ParameterLocation.Header,
-    //    Type = SecuritySchemeType.Http,
-    //    Scheme = JwtBearerDefaults.AuthenticationScheme,
-    //    Reference = new OpenApiReference
-    //    {
-    //        Id = JwtBearerDefaults.AuthenticationScheme,
-    //        Type = ReferenceType.SecurityScheme
-    //    }
-    //});
-    //opts.OperationFilter<SecurityFilter>();
+    opts.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        BearerFormat = "JWT",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = JwtBearerDefaults.AuthenticationScheme,
+        Reference = new OpenApiReference
+        {
+            Id = JwtBearerDefaults.AuthenticationScheme,
+            Type = ReferenceType.SecurityScheme
+        }
+    });
+    opts.OperationFilter<SecurityFilter>();
 });
 
 var app = builder.Build();
@@ -72,8 +74,8 @@ if (app.Environment.IsDevelopment())
 
 //app.UseHttpsRedirection();
 
-//app.UseAuthentication();
-//app.UseAuthorization();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 

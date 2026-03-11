@@ -46,3 +46,14 @@ public partial class Medical
     [InverseProperty("Officer")]
     public virtual ICollection<Vaccination> VaccinationOfficers { get; set; } = new List<Vaccination>();
 }
+
+public class MedicalLoginDTO
+{
+    [Required]
+    [MinLength(3)]
+    public string username { get; set; } = null!;
+
+    [Required]
+    [MinLength(4)]
+    public string password { get; set; } = null!;
+}

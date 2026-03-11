@@ -17,7 +17,8 @@ namespace SocietyVaccinations.Controllers
     {
         SVContext dbc;
         IConfiguration conf;
-        public AuthController(SVContext ctx, IConfiguration c) { dbc = ctx; conf = c; }
+        TokenBlacklister blacklister;
+        public AuthController(SVContext ctx, IConfiguration c, TokenBlacklister tb) { dbc = ctx; conf = c; blacklister = tb; }
 
         [HttpPost("login")]
         async public Task<IActionResult> Login(SocietyLoginDTO input)
@@ -44,6 +45,33 @@ namespace SocietyVaccinations.Controllers
             });
         }
 
+        [HttpPost("medical/login")]
+        async public Task<IActionResult> MedicalLogin(MedicalLoginDTO input)
+        {
+            var medical = await dbc.Medicals.Include(m => m.User).Include(m => m.Spot.Regional).Where(s => s.User.Username == input.username).FirstOrDefaultAsync();
+            if (medical == null) return Helper.err("Username or password incorrect");
+            if (!verifyHash(input.password, medical.User.Password)) return Helper.err("Username or password incorrect");
+            var token = GenJWT(medical.Id.ToString(), medical.Role);
+            await dbc.SaveChangesAsync();
+            return Ok(new
+            {
+                name = medical.Name,
+                role = medical.Role,
+                token = token,
+                spot = new
+                {
+                    id = medical.SpotId,
+                    name = medical.Name,
+                    regional = new
+                    {
+                        id = medical.Spot.RegionalId,
+                        province = medical.Spot.Regional.Province,
+                        district = medical.Spot.Regional.District
+                    }
+                },
+            });
+        }
+
         [HttpPost("logout")]
         //[Authorize]
         async public Task<IActionResult> Logout(string token)
@@ -55,6 +83,19 @@ namespace SocietyVaccinations.Controllers
             return Ok(new {message = "Logout success" });
         }
 
+        [HttpPost("medical/logout")]
+        [Authorize]
+        async public Task<IActionResult> MedicalLogout()
+        {
+            var jwtId = User.FindFirstValue(JwtRegisteredClaimNames.Jti);
+            if (jwtId != null)
+            {
+                blacklister.Ban(jwtId);
+                return Ok(new { message = "Logout success" });
+            }
+            return Helper.err("Token not valid");
+        }
+
         private string GenToken(string id)
         {
             using(var alg = MD5.Create())
@@ -64,22 +105,27 @@ namespace SocietyVaccinations.Controllers
                 foreach(var b in bytes) sb.Append(b.ToString("x2"));
                 return sb.ToString();
             } 
-            //var claims = new Claim[]
-            //{
-            //    new Claim(ClaimTypes.NameIdentifier, id),
-            //    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            //};
-            //var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(conf["Jwt:Key"]));
-            //var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        }
 
-            //var token = new JwtSecurityToken(
-            //    issuer: conf["Jwt:Issuer"],
-            //    audience: conf["Jwt:Audience"],
-            //    claims: claims,
-            //    expires: DateTime.Now.AddHours(1),
-            //    signingCredentials: creds);
+        private string GenJWT(string id, string role)
+        {
+            var claims = new Claim[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, id),
+                new Claim(ClaimTypes.Role, role),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            };
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(conf["Jwt:Key"]));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            //return new JwtSecurityTokenHandler().WriteToken(token);
+            var token = new JwtSecurityToken(
+                issuer: conf["Jwt:Issuer"],
+                audience: conf["Jwt:Audience"],
+                claims: claims,
+                expires: DateTime.Now.AddHours(1),
+                signingCredentials: creds);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
         private string sha256(string s)

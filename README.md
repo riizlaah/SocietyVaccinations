@@ -3,8 +3,9 @@
 REST API untuk vaksinasi.
 
 ## Extended Features (TODO)
-- [ ] Doctor/Officer auth
-- [ ] Consultation acceptance/rejection by Doctor
+- [x] Doctor/Officer auth
+- [x] See list of consultations (doctor)
+- [x] Consultation acceptance/rejection by Doctor
 - [ ] Assign Vaccine of a Vaccination
 - [ ] Assign Vaccinator of a Vaccination
 - [ ] CRUD Regional (need admin)

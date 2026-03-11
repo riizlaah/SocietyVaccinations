@@ -71,5 +71,66 @@ namespace SocietyVaccinations.Controllers
                 }
             });
         }
+
+        [HttpGet("all")]
+        [Authorize(Roles = "doctor")]
+        async public Task<IActionResult> GetAll(string status = "pending")
+        {
+            var statuses = new string[] { "all", "pending", "accepted", "rejected" };
+            if (!statuses.Contains(status)) return Helper.err("Status not valid");
+            var doctorId = Convert.ToInt64(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            var doctor = await dbc.Medicals.Where(m => m.Id == doctorId).Include(m => m.Spot.Regional).FirstAsync();
+            var query = dbc.Consultations.Where(c => c.Society.RegionalId == doctor.Spot.RegionalId && (c.DoctorId == null || c.DoctorId == doctorId)).AsQueryable();
+            if(status != "all")
+            {
+                query = query.Where(c => c.Status == status);
+            }
+            var consults = await query.Include(c => c.Society).ToListAsync();
+            return Ok(consults.Select(c => new
+            {
+                id = c.Id,
+                society = new
+                {
+                    id = c.SocietyId,
+                    name = c.Society.Name,
+                    address = c.Society.Address,
+                },
+                disease_history = c.DiseaseHistory,
+                current_symptoms = c.CurrentSymptoms,
+                doctor_notes = c.DoctorNotes,
+                status = c.Status,
+                doctor = c.Doctor == null ? null : new
+                {
+                    id = doctorId,
+                    name = doctor.Name,
+                    role = doctor.Role
+                },
+                spot = new
+                {
+                    id = doctor.SpotId,
+                    name = doctor.Spot.Name,
+                    address = doctor.Spot.Address,
+                    regional = new
+                    {
+                        id = doctor.Spot.RegionalId,
+                        province = doctor.Spot.Regional.Province,
+                        district = doctor.Spot.Regional.District
+                    }
+                }
+            }));
+        }
+
+        [HttpPut("{id}")]
+        [Authorize(Roles = "doctor")]
+        async public Task<IActionResult> Update(int id, ConsultationUpdateDTO input)
+        {
+            var consult = await dbc.Consultations.FindAsync((long)id);
+            if (consult == null) return NotFound(new { message = "Consultation not found" });
+            consult.DoctorId = Convert.ToInt64(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            consult.Status = input.status;
+            consult.DoctorNotes = input.doctor_notes;
+            await dbc.SaveChangesAsync();
+            return Ok(new { message = "Consultation updated" });
+        }
     }
 }

@@ -49,3 +49,13 @@ public class ConsultationReqDTO
     [Required]
     public string current_symptoms { get; set; } = null!;
 }
+
+public class ConsultationUpdateDTO
+{
+    [Required]
+    [RegularExpression(@"^accepted|pending|rejected$", ErrorMessage = "Status must be pending|accepted|rejected")]
+    public string status { get; set; } = null!;
+
+    [Required]
+    public string doctor_notes { get; set; } = null!;
+}
