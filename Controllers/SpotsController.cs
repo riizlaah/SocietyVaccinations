@@ -1,7 +1,9 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SocietyVaccinations.Models;
+using System.Security.Claims;
 using System.Text.RegularExpressions;
 
 namespace SocietyVaccinations.Controllers
@@ -12,6 +14,28 @@ namespace SocietyVaccinations.Controllers
     {
         SVContext dbc;
         public SpotsController(SVContext ctx) { dbc = ctx; }
+
+        [HttpGet("all")]
+        [Authorize]
+        async public Task<IActionResult> GetAll()
+        {
+            var userId = Convert.ToInt64(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            var regionId = (await dbc.Medicals.Include(m => m.Spot).FirstAsync(m => m.Id == userId)).Spot.RegionalId;
+            var spots = await dbc.Spots.Include(s => s.SpotVaccines).Where(s => s.RegionalId == regionId).ToListAsync();
+            var vaccines = await dbc.Vaccines.ToListAsync();
+
+            return Ok(new
+            {
+                spots = spots.Select(s => new
+                {
+                    id = s.Id,
+                    name = s.Name,
+                    serve = s.Serve,
+                    capacity = s.Capacity,
+                    available_vaccines = vaccines.ToDictionary(v => v.Name, v => s.SpotVaccines.Any(sv => sv.VaccineId == v.Id))
+                })
+            });
+        }
 
         [HttpGet]
         async public Task<IActionResult> GetAll(string token)
@@ -59,5 +83,64 @@ namespace SocietyVaccinations.Controllers
                 vaccinations_count = vaccinationCounts
             });
         }
+
+        // PUT: api/Spots/5
+        [HttpPut("{id}")]
+        [Authorize(Roles = "officer")]
+        public async Task<IActionResult> Update(long id, SpotInputDTO input)
+        {
+            var spot = await dbc.Spots.Include(s => s.SpotVaccines).FirstOrDefaultAsync(s => s.Id == id);
+            if (spot == null) return Helper.err("Spot not found", 404);
+            var count = dbc.Vaccines.Count(v => input.available_vacccines.Contains(v.Id));
+            if(count != input.available_vacccines.Count) return Helper.err("A Vaccine in the list is not exist");
+            if (!await dbc.Regionals.AnyAsync(r => r.Id == input.regionalId)) return Helper.err("Regional not found");
+            
+            spot.updateVaccines(input.available_vacccines);
+            spot.Name = input.name;
+            spot.Address = input.address;
+            spot.Serve = input.serve;
+            spot.Capacity = input.capacity;
+            spot.RegionalId = input.regionalId;
+
+            await dbc.SaveChangesAsync();
+
+            return Ok();
+        }
+
+        // POST: api/Spots
+        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [HttpPost]
+        [Authorize(Roles = "officer")]
+        public async Task<ActionResult<Vaccine>> Create(SpotInputDTO input)
+        {
+            var count = dbc.Vaccines.Count(v => input.available_vacccines.Contains(v.Id));
+            if (count != input.available_vacccines.Count) return Helper.err("A Vaccine in the list is not exist");
+            if (!await dbc.Regionals.AnyAsync(r => r.Id == input.regionalId)) return Helper.err("Regional not found");
+            var newData = input.ToEntity();
+            dbc.Spots.Add(newData);
+            dbc.SaveChanges();
+            newData.updateVaccines(input.available_vacccines);
+            await dbc.SaveChangesAsync();
+
+            return Ok(new {message = "Spot created"});
+        }
+
+        // DELETE: api/Spots/5
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "officer")]
+        public async Task<IActionResult> Delete(long id)
+        {
+            var record = await dbc.Spots.FindAsync(id);
+            if (record == null)
+            {
+                return NotFound();
+            }
+
+            dbc.Spots.Remove(record);
+            await dbc.SaveChangesAsync();
+
+            return Ok();
+        }
+
     }
 }

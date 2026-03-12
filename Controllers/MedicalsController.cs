@@ -41,7 +41,7 @@ namespace SocietyVaccinations.Controllers
         }
 
         [HttpGet("{id}")]
-        [Authorize]
+        [Authorize(Roles = "officer")]
         public async Task<IActionResult> Get(long id)
         {
             var medical = await _context.Medicals.AsQueryable().AsNoTrackingWithIdentityResolution().Include(m => m.User).Include(m => m.Spot).FirstOrDefaultAsync(m => m.Id == id);
@@ -71,9 +71,10 @@ namespace SocietyVaccinations.Controllers
 
         // PUT: api/Medicals/5
         [HttpPut("{id}")]
-        [Authorize]
+        [Authorize(Roles = "officer")]
         public async Task<IActionResult> Update(long id, MedicalInputDTO input)
         {
+            if (!await _context.Spots.AnyAsync(r => r.Id == input.spotId)) return Helper.err("Spot not found");
             var data = await _context.Medicals.AsNoTracking().Include(m => m.User).FirstOrDefaultAsync(m => m.Id == id);
             if (data == null) return Helper.err("Medical not found");
             if (await _context.Users.AnyAsync(u => u.Username == input.username && u.Id != data.UserId)) return Helper.err("Username has been used");
@@ -88,7 +89,7 @@ namespace SocietyVaccinations.Controllers
         // POST: api/Medicals
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        [Authorize]
+        [Authorize(Roles = "officer")]
         public async Task<ActionResult<Regional>> Create(MedicalInputDTO input)
         {
             if (!await _context.Spots.AnyAsync(s => s.Id == input.spotId)) return Helper.err("Spot not found");
@@ -108,7 +109,7 @@ namespace SocietyVaccinations.Controllers
 
         // DELETE: api/Medicals/5
         [HttpDelete("{id}")]
-        [Authorize]
+        [Authorize(Roles = "officer")]
         public async Task<IActionResult> Delete(long id)
         {
             var medical = await _context.Medicals.FindAsync(id);

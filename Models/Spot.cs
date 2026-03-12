@@ -42,4 +42,48 @@ public partial class Spot
 
     [InverseProperty("Spot")]
     public virtual ICollection<Vaccination> Vaccinations { get; set; } = new List<Vaccination>();
+
+    public void updateVaccines(List<long> vaccineIds)
+    {
+        foreach (var vId in vaccineIds)
+        {
+            if (SpotVaccines.Any(sv => sv.VaccineId == vId)) continue;
+            SpotVaccines.Add(new SpotVaccine { VaccineId = vId, SpotId = vId });
+        }
+        var toRemoved = SpotVaccines.Where(sv => !vaccineIds.Contains(sv.VaccineId)).ToList();
+        foreach(var sv in toRemoved)
+        {
+            SpotVaccines.Remove(sv);
+        }
+    }
+}
+
+public class SpotInputDTO
+{
+    [Required]
+    public string name { get; set; } = null!;
+
+    [Required]
+    public string address { get; set; } = null!;
+
+    [Required]
+    [Range(1, 3)]
+    public byte serve { get; set; }
+
+    [Required]
+    [Range(1, int.MaxValue)]
+    public int capacity { get; set; }
+
+    [Required]
+    public long regionalId { get; set; }
+
+    [Required]
+    public List<long> available_vacccines { get; set; } = new List<long>();
+
+    public Spot ToEntity()
+    {
+        return new Spot { Name = name, Address = address, Serve = serve, Capacity = capacity, RegionalId = regionalId};
+    }
+
+    
 }

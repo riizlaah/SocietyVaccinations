@@ -7,8 +7,9 @@ REST API untuk vaksinasi.
 - [x] See list of consultations (doctor)
 - [x] Consultation acceptance/rejection by Doctor
 - [x] Set `Vaccine` or `Doctor` of a Vaccination
-- [x] CRUD Regional (by officer)
-- [x] CRUD Medical (by officer)
-- [ ] CRUD Vaccines (by officer)
-- [ ] CRUD Spots (by officer)
-- [ ] CRUD Societies (by officer)
+- [x] CRUD `Regional` (by officer)
+- [x] CRUD `Medical` (by officer)
+- [x] CRUD `Vaccine` (by officer)
+- [x] CRUD `Spot` with available vaccines (by officer)
+- [x] CRUD `Society` (by officer)
+- [ ] Vaccinations?

@@ -23,3 +23,18 @@ public partial class Vaccine
     [InverseProperty("Vaccine")]
     public virtual ICollection<Vaccination> Vaccinations { get; set; } = new List<Vaccination>();
 }
+
+public class VaccineInputDTO
+{
+    [Required]
+    public string name { get; set; } = null!;
+
+    public Vaccine ToEntity()
+    {
+        return new Vaccine { Name = name };
+    }
+    public Vaccine ToEntity(long id)
+    {
+        return new Vaccine { Id = id, Name = name };
+    }
+}

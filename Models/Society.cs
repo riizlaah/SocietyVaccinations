@@ -64,3 +64,38 @@ public class SocietyLoginDTO
     public string password { get; set; }
 }
 
+public class SocietyInputDTO
+{
+    [Required]
+    public string name { get; set; } = null!;
+
+    [Required]
+    [RegularExpression(@"^\d{8}$", ErrorMessage = "ID Card Number not valid")]
+    
+    public string id_card_number { get; set; } = null!;
+
+    public string? password { get; set; }
+
+    [Required]
+    public DateOnly born_date { get; set; }
+
+    [Required]
+    public string address { get; set; } = null!;
+
+    [Required]
+    [RegularExpression(@"^male|female$", ErrorMessage = "Gender must be male or female")]
+    public string gender { get; set; }
+
+    [Required]
+    public long regionalId { get; set;  }
+
+    public Society ToEntity()
+    {
+        return new Society { Name = name, Password = Helper.sha256(password), IdCardNumber = id_card_number, BornDate = born_date, Address = address, Gender = gender, RegionalId = regionalId, LoginTokens = "" };
+    }
+
+    public Society ToEntity(long id, string password)
+    {
+        return new Society { Id = id, Name = name, Password = password, IdCardNumber = id_card_number, BornDate = born_date, Address = address, Gender = gender, RegionalId = regionalId, LoginTokens = "" };
+    }
+}

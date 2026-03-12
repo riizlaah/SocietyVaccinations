@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SocietyVaccinations.Models;
@@ -12,48 +7,53 @@ namespace SocietyVaccinations.Controllers
 {
     [Route("api/v1/[controller]")]
     [ApiController]
-    public class RegionalsController : ControllerBase
+    public class VaccinesController: ControllerBase
     {
         private readonly SVContext _context;
 
-        public RegionalsController(SVContext context)
+        public VaccinesController(SVContext context)
         {
             _context = context;
         }
 
-        // GET: api/Regionals
+        // GET: api/Vaccines
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var datas = await _context.Regionals.ToListAsync();
-            return Ok(datas.Select(r => new
+            var datas = await _context.Vaccines.Select(v => new
             {
-                id = r.Id,
-                province = r.Province,
-                district = r.District
-            }));
+                id = v.Id,
+                name = v.Name,
+                vaccination_count = v.Vaccinations.Count
+            }).ToListAsync();
+            return Ok(datas);
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Regional>> Get(long id)
+        public async Task<IActionResult> Get(long id)
         {
-            var data = await _context.Regionals.FindAsync(id);
+            var data = await _context.Vaccines.Where(v => v.Id == id).Select(v => new
+            {
+                id = v.Id,
+                name = v.Name,
+                vaccination_count = v.Vaccinations.Count
+            }).FirstAsync();
 
             if (data == null)
             {
                 return NotFound();
             }
 
-            return data;
+            return Ok(data);
         }
 
-        // PUT: api/Regionals/5
+        // PUT: api/Vaccines/5
         [HttpPut("{id}")]
         [Authorize(Roles = "officer")]
-        public async Task<IActionResult> Update(long id, RegionalInputDTO input)
+        public async Task<IActionResult> Update(long id, VaccineInputDTO input)
         {
 
-            _context.Entry(input.ToRegional(id)).State = EntityState.Modified;
+            _context.Entry(input.ToEntity(id)).State = EntityState.Modified;
 
             try
             {
@@ -74,31 +74,31 @@ namespace SocietyVaccinations.Controllers
             return Ok();
         }
 
-        // POST: api/Regionals
+        // POST: api/Vaccines
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
         [Authorize(Roles = "officer")]
-        public async Task<ActionResult<Regional>> Create(RegionalInputDTO input)
+        public async Task<ActionResult<Vaccine>> Create(VaccineInputDTO input)
         {
-            var newData = input.ToRegional();
-            _context.Regionals.Add(newData);
+            var newData = input.ToEntity();
+            _context.Vaccines.Add(newData);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction("Get", new { id = newData.Id }, newData);
         }
 
-        // DELETE: api/Regionals/5
+        // DELETE: api/Vaccines/5
         [HttpDelete("{id}")]
         [Authorize(Roles = "officer")]
         public async Task<IActionResult> Delete(long id)
         {
-            var record = await _context.Regionals.FindAsync(id);
+            var record = await _context.Vaccines.FindAsync(id);
             if (record == null)
             {
                 return NotFound();
             }
 
-            _context.Regionals.Remove(record);
+            _context.Vaccines.Remove(record);
             await _context.SaveChangesAsync();
 
             return Ok();
@@ -106,7 +106,7 @@ namespace SocietyVaccinations.Controllers
 
         private bool Exists(long id)
         {
-            return _context.Regionals.Any(e => e.Id == id);
+            return _context.Vaccines.Any(e => e.Id == id);
         }
     }
 }
