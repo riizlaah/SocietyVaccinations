@@ -27,3 +27,23 @@ public partial class Regional
     [InverseProperty("Regional")]
     public virtual ICollection<Spot> Spots { get; set; } = new List<Spot>();
 }
+
+public class RegionalInputDTO
+{
+    [Required]
+
+    public string province { get; set; } = null!;
+
+    [Required]
+    public string district { get; set; } = null!;
+
+    public Regional ToRegional(long id)
+    {
+        return new Regional { Id = id, Province = province, District = district }; 
+    }
+
+    public Regional ToRegional()
+    {
+        return new Regional { Province = province, District = district };
+    }
+}

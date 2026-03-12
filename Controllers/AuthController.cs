@@ -25,7 +25,7 @@ namespace SocietyVaccinations.Controllers
         {
             var user = await dbc.Societies.Include(s => s.Regional).Where(s => s.IdCardNumber == input.id_card_number).FirstOrDefaultAsync();
             if (user == null) return Helper.err("ID Card Number or password incorrect");
-            if (!verifyHash(input.password, user.Password)) return Helper.err("ID Card Number or password incorrect");
+            if (!Helper.verifyHash(input.password, user.Password)) return Helper.err("ID Card Number or password incorrect");
             var token = GenToken(user.Id.ToString());
             (await dbc.Societies.FindAsync(user.Id)).LoginTokens = "," + token + ",";
             await dbc.SaveChangesAsync();
@@ -50,7 +50,7 @@ namespace SocietyVaccinations.Controllers
         {
             var medical = await dbc.Medicals.Include(m => m.User).Include(m => m.Spot.Regional).Where(s => s.User.Username == input.username).FirstOrDefaultAsync();
             if (medical == null) return Helper.err("Username or password incorrect");
-            if (!verifyHash(input.password, medical.User.Password)) return Helper.err("Username or password incorrect");
+            if (!Helper.verifyHash(input.password, medical.User.Password)) return Helper.err("Username or password incorrect");
             var token = GenJWT(medical.Id.ToString(), medical.Role);
             await dbc.SaveChangesAsync();
             return Ok(new
@@ -128,25 +128,7 @@ namespace SocietyVaccinations.Controllers
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        private string sha256(string s)
-        {
-            using (var alg = SHA256.Create())
-            {
-                var hashedBytes = alg.ComputeHash(Encoding.UTF8.GetBytes(s));
-                var sb = new StringBuilder();
-                foreach (var b in hashedBytes)
-                {
-                    sb.Append(b.ToString("x2"));
-                }
-                return sb.ToString();
-            }
-        }
-
-        private bool verifyHash(string input, string hash)
-        {
-            var hashedInput = sha256(input);
-            return StringComparer.OrdinalIgnoreCase.Compare(hashedInput, hash) == 0;
-        }
+        
 
     }
 }
