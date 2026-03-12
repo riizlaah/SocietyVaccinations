@@ -72,3 +72,34 @@ public class VaccinationUpdateDTO
 
     public long? vaccine_id { get; set; } = null;
 }
+
+public class VaccinationInputDTO
+{
+    [Required]
+    [Range(1, byte.MaxValue)]
+    public byte dose { get; set; }
+
+    [Required]
+    public DateOnly date { get; set; }
+
+    [Required]
+    public long society_id { get; set; }
+
+    [Required]
+    public long spot_id { get; set; }
+
+    public long? vaccine_id { get; set; }
+
+    public long? doctor_id { get; set; }
+
+
+    public Vaccination ToEntity(long officerId)
+    {
+        return new Vaccination { Dose = dose, Date = date, SocietyId = society_id, SpotId = spot_id, VaccineId = vaccine_id, DoctorId = doctor_id, OfficerId = officerId };
+    }
+
+    public Vaccination ToEntity(long id, long officerId)
+    {
+        return new Vaccination { Id = id, Dose = dose, Date = date, SocietyId = society_id, SpotId = spot_id, VaccineId = vaccine_id, DoctorId = doctor_id, OfficerId = officerId };
+    }
+}

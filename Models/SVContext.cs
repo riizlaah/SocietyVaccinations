@@ -34,7 +34,12 @@ public partial class SVContext : DbContext
     public virtual DbSet<Vaccine> Vaccines { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-        => optionsBuilder.UseSqlServer("Data Source=(localdb)\\mssqllocaldb;Integrated Security=true;Database=SocietyVaccination");
+    {
+        optionsBuilder.UseSqlServer("Data Source=(localdb)\\mssqllocaldb;Integrated Security=true;Database=SocietyVaccination", opt =>
+        {
+            opt.EnableRetryOnFailure();
+        });
+    } 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

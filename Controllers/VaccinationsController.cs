@@ -28,7 +28,7 @@ namespace SocietyVaccinations.Controllers
             if (vaccineCount == 2) return Helper.err("Society has been 2x vaccinated");
             else if(vaccineCount == 1)
             {
-                if(await dbc.Vaccinations.AnyAsync(v => EF.Functions.DateDiffDay(v.Date.ToDateTime(TimeOnly.MinValue), DateTime.Now.Date) < 30))
+                if(await dbc.Vaccinations.AnyAsync(v => EF.Functions.DateDiffDay(v.Date.ToDateTime(TimeOnly.MinValue), DateTime.Now.Date) < 30 && v.SocietyId == userId))
                 {
                     return Helper.err("Wait at least +30 days from 1st Vaccination");
                 }
@@ -124,8 +124,125 @@ namespace SocietyVaccinations.Controllers
             }));
         }
 
+        [HttpGet("{id}")]
+        [Authorize(Roles = "officer")]
+        async public Task<IActionResult> Get(long id)
+        {
+            var record = await dbc.Vaccinations.AsQueryable().AsNoTracking()
+                .Include(v => v.Vaccine)
+                .Include(v => v.Doctor)
+                .Include(v => v.Society)
+                .Include(v => v.Officer)
+                .Include(v => v.Spot.Regional)
+                .FirstOrDefaultAsync(v => v.Id == id);
+            if (record == null) return Helper.err("Vaccination not found", 404);
+            return Ok(new
+            {
+                id = record.Id,
+                dose = record.Dose,
+                date = record.Date,
+                society_id = record.SocietyId,
+                vaccine_id = record.VaccineId,
+                doctor_id = record.DoctorId,
+                officer_id = record.OfficerId,
+                spot_id = record.SpotId,
+                society = new
+                {
+                    id = record.SocietyId,
+                    name = record.Society.Name,
+                    address = record.Society.Address
+                },
+                vaccine = record.VaccineId == null ? null : new
+                {
+                    id = record.VaccineId,
+                    name = record.Vaccine.Name
+                },
+                vaccinator = record.DoctorId == null ? null : new
+                {
+                    id = record.DoctorId,
+                    name = record.Doctor.Name,
+                    role = record.Doctor.Role
+                },
+                officer = new
+                {
+                    id = record.OfficerId,
+                    name = record.Officer.Name,
+                    role = record.Officer.Role
+                },
+                spot = new
+                {
+                    id = record.SpotId,
+                    name = record.Spot.Name,
+                    address = record.Spot.Address,
+                    regional = new
+                    {
+                        id = record.Spot.RegionalId,
+                        provine = record.Spot.Regional.Province,
+                        district = record.Spot.Regional.District
+                    }
+                }
+            });
+        }
+
+
+        [HttpPost("create")]
+        [Authorize(Roles = "officer")]
+        async public Task<IActionResult> DetailedCreate(VaccinationInputDTO input)
+        {
+            if (!await dbc.Societies.AnyAsync(s => s.Id == input.society_id)) return Helper.err("Society not found");
+            if (!await dbc.Spots.AnyAsync(s => s.Id == input.spot_id)) return Helper.err("Spot not found");
+            var vaccination = await dbc.Vaccinations.CountAsync(v => v.SocietyId == input.society_id);
+            if (vaccination == 2) return Helper.err("Society has been 2x vaccinated");
+            if (await dbc.Vaccinations.AnyAsync(v => EF.Functions.DateDiffDay(v.Date.ToDateTime(TimeOnly.MinValue), DateTime.Now.Date) < 30 && v.SocietyId == input.society_id))
+            {
+                return Helper.err("Wait at least +30 days from 1st Vaccination");
+            }
+            var officerId = Convert.ToInt64(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            var record = input.ToEntity(officerId);
+            if (input.doctor_id.HasValue)
+            {
+                if (!await dbc.Medicals.AnyAsync(m => m.Id == input.doctor_id.Value)) return Helper.err("Doctor not found");
+                record.DoctorId = input.doctor_id.Value;
+            }
+            if (input.vaccine_id.HasValue)
+            {
+                if (!await dbc.Vaccines.AnyAsync(m => m.Id == input.vaccine_id.Value)) return Helper.err("Vaccine not found");
+                record.VaccineId = input.vaccine_id.Value;
+            }
+
+            dbc.Vaccinations.Add(record);
+            await dbc.SaveChangesAsync();
+            return Ok();
+        }
+
         [HttpPut("{id}")]
         [Authorize(Roles = "officer")]
+        async public Task<IActionResult> DetailedUpdate(long id, VaccinationInputDTO input)
+        {
+            if (!await dbc.Vaccinations.AnyAsync(m => m.Id == id)) return Helper.err("Vaccination not found", 404);
+            if (!await dbc.Societies.AnyAsync(s => s.Id == input.society_id)) return Helper.err("Society not found");
+            if (!await dbc.Spots.AnyAsync(s => s.Id == input.spot_id)) return Helper.err("Spot not found");
+            
+            var officerId = Convert.ToInt64(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            if ((await dbc.Vaccinations.FindAsync(id)).OfficerId != officerId) return Helper.err("Forbidden", 403);
+            var record = input.ToEntity(id, officerId);
+            if (input.doctor_id.HasValue)
+            {
+                if (!await dbc.Medicals.AnyAsync(m => m.Id == input.doctor_id.Value)) return Helper.err("Doctor not found");
+                record.DoctorId = input.doctor_id.Value;
+            }
+            if (input.vaccine_id.HasValue)
+            {
+                if (!await dbc.Vaccines.AnyAsync(m => m.Id == input.vaccine_id.Value)) return Helper.err("Vaccine not found");
+                record.VaccineId = input.vaccine_id.Value;
+            }
+            dbc.Entry(record).State = EntityState.Modified;
+            await dbc.SaveChangesAsync();
+            return Ok();
+        }
+
+        [HttpPatch("{id}")]
+        [Authorize]
         async public Task<IActionResult> UpdateVaccinations(long id, VaccinationUpdateDTO input)
         {
             if (input == null) return Helper.err("Not valid");
@@ -141,10 +258,21 @@ namespace SocietyVaccinations.Controllers
             if (vaccination == null) return Helper.err("Vaccination not found", 404);
             var officerId = Convert.ToInt64(User.FindFirstValue(ClaimTypes.NameIdentifier));
             if (vaccination.OfficerId == null) vaccination.OfficerId = officerId;
-            vaccination.DoctorId = input.doctor_id;
-            vaccination.VaccineId = input.vaccine_id;
+            if(input.doctor_id.HasValue) vaccination.DoctorId = input.doctor_id;
+            if (input.vaccine_id.HasValue) vaccination.VaccineId = input.vaccine_id;
             await dbc.SaveChangesAsync();
             return Ok(new {message = "Vaccination updated"});
+        }
+
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "officer")]
+        async public Task<IActionResult> Delete(long id)
+        {
+            var record = await dbc.Vaccinations.FindAsync(id);
+            if (record == null) return Helper.err("Vaccination not found", 404);
+            dbc.Vaccinations.Remove(record);
+            await dbc.SaveChangesAsync();
+            return Ok();
         }
 
         private async Task<object> formatVaccination(Vaccination vacc)

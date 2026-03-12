@@ -12,4 +12,4 @@ REST API untuk vaksinasi.
 - [x] CRUD `Vaccine` (by officer)
 - [x] CRUD `Spot` with available vaccines (by officer)
 - [x] CRUD `Society` (by officer)
-- [ ] Vaccinations?
+- [ ] CRUD `Vaccinations`?
