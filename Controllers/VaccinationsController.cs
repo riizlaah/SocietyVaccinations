@@ -28,7 +28,7 @@ namespace SocietyVaccinations.Controllers
             if (vaccineCount == 2) return Helper.err("Society has been 2x vaccinated");
             else if(vaccineCount == 1)
             {
-                if(await dbc.Vaccinations.AnyAsync(v => EF.Functions.DateDiffDay(v.Date.ToDateTime(TimeOnly.MinValue), DateTime.Now.Date) < 30 && v.SocietyId == userId))
+                if(await dbc.Vaccinations.Where(v => EF.Functions.DateDiffDay(v.Date, DateOnly.FromDateTime(DateTime.Now.Date)) < 30 && v.SocietyId == userId).AnyAsync())
                 {
                     return Helper.err("Wait at least +30 days from 1st Vaccination");
                 }
@@ -72,7 +72,7 @@ namespace SocietyVaccinations.Controllers
         {
             var officerId = Convert.ToInt64(User.FindFirstValue(ClaimTypes.NameIdentifier));
             var officer = await dbc.Medicals.Where(v => v.Id == officerId).Include(m => m.Spot.Regional).FirstAsync();
-            var vaccinations = await dbc.Vaccinations.AsQueryable()
+            var vaccinations = await dbc.Vaccinations.AsQueryable().AsNoTrackingWithIdentityResolution()
                 .Where(v => v.OfficerId == null || v.OfficerId == officerId)
                 .Where(v => v.SpotId == officer.SpotId)
                 .Include(v => v.Vaccine)
@@ -193,7 +193,7 @@ namespace SocietyVaccinations.Controllers
             if (!await dbc.Spots.AnyAsync(s => s.Id == input.spot_id)) return Helper.err("Spot not found");
             var vaccination = await dbc.Vaccinations.CountAsync(v => v.SocietyId == input.society_id);
             if (vaccination == 2) return Helper.err("Society has been 2x vaccinated");
-            if (await dbc.Vaccinations.AnyAsync(v => EF.Functions.DateDiffDay(v.Date.ToDateTime(TimeOnly.MinValue), DateTime.Now.Date) < 30 && v.SocietyId == input.society_id))
+            if (await dbc.Vaccinations.Where(v => EF.Functions.DateDiffDay(v.Date, DateOnly.FromDateTime(DateTime.Now.Date)) < 30 && v.SocietyId == input.society_id).AnyAsync())
             {
                 return Helper.err("Wait at least +30 days from 1st Vaccination");
             }
@@ -225,7 +225,7 @@ namespace SocietyVaccinations.Controllers
             
             var officerId = Convert.ToInt64(User.FindFirstValue(ClaimTypes.NameIdentifier));
             if ((await dbc.Vaccinations.FindAsync(id)).OfficerId != officerId) return Helper.err("Forbidden", 403);
-            var record = input.ToEntity(id, officerId);
+            var record = await dbc.Vaccinations.FindAsync(id);
             if (input.doctor_id.HasValue)
             {
                 if (!await dbc.Medicals.AnyAsync(m => m.Id == input.doctor_id.Value)) return Helper.err("Doctor not found");
@@ -236,7 +236,10 @@ namespace SocietyVaccinations.Controllers
                 if (!await dbc.Vaccines.AnyAsync(m => m.Id == input.vaccine_id.Value)) return Helper.err("Vaccine not found");
                 record.VaccineId = input.vaccine_id.Value;
             }
-            dbc.Entry(record).State = EntityState.Modified;
+            record.Dose = input.dose;
+            record.Date = input.date;
+            record.SocietyId = input.society_id;
+            record.SpotId = input.spot_id;
             await dbc.SaveChangesAsync();
             return Ok();
         }

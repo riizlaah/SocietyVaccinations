@@ -39,6 +39,7 @@ public partial class SVContext : DbContext
         {
             opt.EnableRetryOnFailure();
         });
+        optionsBuilder.EnableSensitiveDataLogging();
     } 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
