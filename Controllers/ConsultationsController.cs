@@ -2,8 +2,10 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using SocietyVaccinations.Models;
 using System.Diagnostics;
+using System.Numerics;
 using System.Security.Claims;
 
 namespace SocietyVaccinations.Controllers
@@ -73,19 +75,23 @@ namespace SocietyVaccinations.Controllers
         }
 
         [HttpGet("all")]
-        [Authorize(Roles = "doctor")]
+        [Authorize]
         async public Task<IActionResult> GetAll(string status = "pending")
         {
             var statuses = new string[] { "all", "pending", "accepted", "rejected" };
             if (!statuses.Contains(status)) return Helper.err("Status not valid");
             var doctorId = Convert.ToInt64(User.FindFirstValue(ClaimTypes.NameIdentifier));
             var doctor = await dbc.Medicals.Where(m => m.Id == doctorId).Include(m => m.Spot.Regional).FirstAsync();
-            var query = dbc.Consultations.Where(c => c.Society.RegionalId == doctor.Spot.RegionalId && (c.DoctorId == null || c.DoctorId == doctorId)).AsQueryable();
+            var query = dbc.Consultations.Where(c => c.Society.RegionalId == doctor.Spot.RegionalId).AsQueryable().AsNoTrackingWithIdentityResolution();
             if(status != "all")
             {
                 query = query.Where(c => c.Status == status);
             }
-            var consults = await query.Include(c => c.Society).ToListAsync();
+            if(User.FindFirstValue(ClaimTypes.Role) == "doctor")
+            {
+                query = query.Where(c => c.DoctorId == null || c.DoctorId == doctorId);
+            }
+            var consults = await query.Include(c => c.Society).Include(c => c.Doctor).ToListAsync();
             return Ok(consults.Select(c => new
             {
                 id = c.Id,
@@ -101,26 +107,42 @@ namespace SocietyVaccinations.Controllers
                 status = c.Status,
                 doctor = c.Doctor == null ? null : new
                 {
-                    id = doctorId,
-                    name = doctor.Name,
-                    role = doctor.Role
-                },
-                spot = new
-                {
-                    id = doctor.SpotId,
-                    name = doctor.Spot.Name,
-                    address = doctor.Spot.Address,
-                    regional = new
-                    {
-                        id = doctor.Spot.RegionalId,
-                        province = doctor.Spot.Regional.Province,
-                        district = doctor.Spot.Regional.District
-                    }
+                    id = c.DoctorId,
+                    name = c.Doctor.Name,
+                    role = c.Doctor.Role
                 }
             }));
         }
 
-        [HttpPut("{id}")]
+        [HttpGet("{id}")]
+        [Authorize]
+        async public Task<IActionResult> Get(long id)
+        {
+            var record = await dbc.Consultations.AsQueryable().Include(c => c.Doctor).Include(c => c.Society).FirstOrDefaultAsync(c => c.Id == id);
+            if (record == null) return Helper.err("Consultation not found");
+            return Ok(new
+            {
+                id = record.Id,
+                society = new
+                {
+                    id = record.SocietyId,
+                    name = record.Society.Name,
+                    address = record.Society.Address,
+                },
+                disease_history = record.DiseaseHistory,
+                current_symptoms = record.CurrentSymptoms,
+                doctor_notes = record.DoctorNotes,
+                status = record.Status,
+                doctor = record.Doctor == null ? null : new
+                {
+                    id = record.DoctorId,
+                    name = record.Doctor.Name,
+                    role = record.Doctor.Role
+                }
+            });
+        }
+
+        [HttpPatch("{id}")]
         [Authorize(Roles = "doctor")]
         async public Task<IActionResult> Update(int id, ConsultationUpdateDTO input)
         {
@@ -131,6 +153,47 @@ namespace SocietyVaccinations.Controllers
             consult.DoctorNotes = input.doctor_notes;
             await dbc.SaveChangesAsync();
             return Ok(new { message = "Consultation updated" });
+        }
+
+        [HttpPost("create")]
+        [Authorize(Roles = "officer")]
+        async public Task<IActionResult> DetailedCreate(ConsultationInputDTO input)
+        {
+            if(input.DoctorId.HasValue)
+            {
+                if (!await dbc.Medicals.AnyAsync(m => m.Id == input.DoctorId && m.Role == "doctor")) return Helper.err("Doctor not found");
+            }
+            if (!await dbc.Societies.AnyAsync(s => s.Id == input.SocietyId)) return Helper.err("Society not found");
+            if (input.Status.IsNullOrEmpty()) input.Status = "pending";
+            var record = input.ToEntity();
+            dbc.Consultations.Add(record);
+            await dbc.SaveChangesAsync();
+            return Ok(record);
+        }
+
+        [HttpPut("{id}")]
+        [Authorize(Roles = "officer")]
+        async public Task<IActionResult> DetailedUpdate(long id, ConsultationInputDTO input)
+        {
+            if (!await dbc.Consultations.AnyAsync(c => c.Id == id)) return Helper.err("Consultation not found");
+            if (!await dbc.Medicals.AnyAsync(m => m.Id == input.DoctorId && m.Role == "doctor")) return Helper.err("Doctor not found");
+            if (!await dbc.Societies.AnyAsync(s => s.Id == input.SocietyId)) return Helper.err("Society not found");
+            if (input.Status.IsNullOrEmpty()) input.Status = "pending";
+            var record = input.ToEntity(id);
+            dbc.Entry(record).State = EntityState.Modified;
+            await dbc.SaveChangesAsync();
+            return Ok();
+        }
+
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "officer")]
+        async public Task<IActionResult> Delete(long id)
+        {
+            var record = dbc.Consultations.Find(id);
+            if (record == null) return Helper.err("Consultation not found", 404);
+            dbc.Consultations.Remove(record);
+            await dbc.SaveChangesAsync();
+            return Ok();
         }
     }
 }

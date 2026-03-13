@@ -98,8 +98,5 @@ public class VaccinationInputDTO
         return new Vaccination { Dose = dose, Date = date, SocietyId = society_id, SpotId = spot_id, VaccineId = vaccine_id, DoctorId = doctor_id, OfficerId = officerId };
     }
 
-    public Vaccination ToEntity(long id, long officerId)
-    {
-        return new Vaccination { Id = id, Dose = dose, Date = date, SocietyId = society_id, SpotId = spot_id, VaccineId = vaccine_id, DoctorId = doctor_id, OfficerId = officerId };
-    }
+    
 }

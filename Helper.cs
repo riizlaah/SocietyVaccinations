@@ -7,14 +7,12 @@ namespace SocietyVaccinations
     public class Helper
     {
 
-        public static ContentResult err(string msg, int code = 401)
+        public static ObjectResult err(string msg, int code = 401)
         {
-            return new ContentResult
-            {
-                ContentType = "application/json",
-                Content = "{\"message\": \"" + msg + "\"}",
+            return new ObjectResult(new {message = msg}) {
                 StatusCode = code
-            };
+            }
+            ;
         }
 
         public static string sha256(string s)

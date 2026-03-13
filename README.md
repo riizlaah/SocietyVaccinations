@@ -13,4 +13,5 @@ REST API untuk vaksinasi.
 - [x] CRUD `Spots` with available vaccines (by officer)
 - [x] CRUD `Societies` (by officer)
 - [x] CRUD `Vaccinations`?
-- [ ] CRUD `Consultations`?
+- [x] CRUD `Consultations`?
+- [x] ApiResponse wrapper

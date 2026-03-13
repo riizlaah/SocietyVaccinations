@@ -44,9 +44,7 @@ public partial class Consultation
 
 public class ConsultationReqDTO
 {
-    [Required]
     public string disease_history { get; set; } = null!;
-    [Required]
     public string current_symptoms { get; set; } = null!;
 }
 
@@ -56,6 +54,31 @@ public class ConsultationUpdateDTO
     [RegularExpression(@"^accepted|pending|rejected$", ErrorMessage = "Status must be pending|accepted|rejected")]
     public string status { get; set; } = null!;
 
-    [Required]
     public string doctor_notes { get; set; } = null!;
+}
+
+public class ConsultationInputDTO
+{
+    [Required]
+    public long SocietyId { get; set; }
+
+    public long? DoctorId { get; set; }
+
+    [RegularExpression(@"^accepted|pending|rejected$", ErrorMessage = "Status must be pending|accepted|rejected")]
+    public string Status { get; set; } = null!;
+
+    public string DiseaseHistory { get; set; } = null!;
+
+    public string CurrentSymptoms { get; set; } = null!;
+
+    public string DoctorNotes { get; set; } = null!;
+
+    public Consultation ToEntity()
+    {
+        return new Consultation { SocietyId = SocietyId, DoctorId = DoctorId, Status = Status, DiseaseHistory = DiseaseHistory, CurrentSymptoms = CurrentSymptoms, DoctorNotes = DoctorNotes };
+    }
+    public Consultation ToEntity(long id)
+    {
+        return new Consultation { Id = id, SocietyId = SocietyId, DoctorId = DoctorId, Status = Status, DiseaseHistory = DiseaseHistory, CurrentSymptoms = CurrentSymptoms, DoctorNotes = DoctorNotes };
+    }
 }

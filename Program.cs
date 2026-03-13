@@ -6,6 +6,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using Microsoft.OpenApi.Models;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Mvc;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,6 +29,21 @@ builder.Services.AddAuthentication().AddJwtBearer(options =>
     };
     options.Events = new JwtBearerEvents
     {
+        OnChallenge = async ctx =>
+        {
+            ctx.HandleResponse();
+            var res = ApiResponse<object>.Error("Authorization token missing or invalid", 401);
+            ctx.Response.StatusCode = 401;
+            ctx.Response.ContentType = "application/json";
+            ctx.Response.WriteAsJsonAsync(res);
+        },
+        OnForbidden = async ctx =>
+        {
+            var res = ApiResponse<object>.Error("Access denied, require higher role", 403);
+            ctx.Response.StatusCode = 403;
+            ctx.Response.ContentType = "application/json";
+            ctx.Response.WriteAsJsonAsync(res);
+        },
         OnTokenValidated = async ctx =>
         {
             var blacklister = ctx.HttpContext.RequestServices.GetRequiredService<TokenBlacklister>();
@@ -37,12 +53,15 @@ builder.Services.AddAuthentication().AddJwtBearer(options =>
             {
                 ctx.Fail("Token not valid");
             }
-
         }
+
     };
 });
 builder.Services.AddAuthorization();
-builder.Services.AddControllers();
+builder.Services.AddControllers(opt =>
+{
+    opt.Filters.Add<ResponseWrapper>();
+});
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(opts =>
@@ -62,6 +81,20 @@ builder.Services.AddSwaggerGen(opts =>
     });
     opts.OperationFilter<SecurityFilter>();
 });
+builder.Services.Configure<ApiBehaviorOptions>(opt =>
+{
+    opt.InvalidModelStateResponseFactory = ctx =>
+    {
+        var errs = ctx.ModelState
+        .Where(e => e.Value.Errors.Count > 0)
+        .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Errors.Select(e => e.ErrorMessage).ToArray());
+        var res = ApiResponse<object>.Error("Validation failed", 422, errs);
+        return new ObjectResult(res)
+        {
+            StatusCode = 422
+        };
+    };
+});
 
 var app = builder.Build();
 
@@ -71,6 +104,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseMiddleware<ErrorHandlingMiddleware>();
 
 //app.UseHttpsRedirection();
 
